@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/client";
 
 export type CardRow = {
   id: string;
@@ -82,7 +82,7 @@ export function CardsProvider({ children }: { children: React.ReactNode }) {
       .from("cards")
       .select("*")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .order("id", { ascending: false });
 
     if (error) {
       console.error("refreshCards error:", error.message);

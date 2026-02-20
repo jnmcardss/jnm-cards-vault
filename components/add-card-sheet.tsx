@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCards, type CardRow } from "@/lib/cards-store";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/client";
 import { uploadCardImage } from "@/lib/uploadCardImage";
 
 export function AddCardSheet() {
@@ -70,7 +70,7 @@ export function AddCardSheet() {
       }
     }
 
-    addCard({
+    await addCard({
       player: player.trim(),
       team: team.trim() || "—",
       year: Number(year) || 0,

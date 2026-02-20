@@ -80,6 +80,7 @@ export function CollectionTable() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[92px]">IMAGE</TableHead>
               <TableHead className="w-[260px]">PLAYER</TableHead>
               <TableHead>SET</TableHead>
               <TableHead className="text-right">PAID</TableHead>
@@ -92,7 +93,7 @@ export function CollectionTable() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-slate-500">
+                <TableCell colSpan={7} className="py-10 text-center text-slate-500">
                   No cards match your search.
                 </TableCell>
               </TableRow>
@@ -102,6 +103,22 @@ export function CollectionTable() {
 
                 return (
                   <TableRow key={c.id}>
+                    {/* IMAGE */}
+                    <TableCell>
+                      {c.image_url ? (
+                        <img
+                          src={c.image_url}
+                          alt={c.player || "Card image"}
+                          className="h-16 w-16 rounded border object-contain bg-white"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="h-16 w-16 rounded border flex items-center justify-center text-[10px] text-slate-400">
+                          No image
+                        </div>
+                      )}
+                    </TableCell>
+
                     <TableCell>
                       <div className="font-semibold">{c.player || "—"}</div>
                       <div className="text-sm text-slate-500">
@@ -114,9 +131,7 @@ export function CollectionTable() {
                       <div className="text-sm text-slate-500">{c.set || "—"}</div>
                     </TableCell>
 
-                    <TableCell className="text-right">
-                      {money(c.paid)}
-                    </TableCell>
+                    <TableCell className="text-right">{money(c.paid)}</TableCell>
 
                     <TableCell className="text-right">
                       <div>{money(c.value)}</div>
@@ -142,18 +157,10 @@ export function CollectionTable() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() =>
-                                openComps(ebaySoldUrl(query))
-                              }
-                            >
+                            <DropdownMenuItem onClick={() => openComps(ebaySoldUrl(query))}>
                               View eBay Sold
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                openComps(point130Url(query))
-                              }
-                            >
+                            <DropdownMenuItem onClick={() => openComps(point130Url(query))}>
                               View 130Point
                             </DropdownMenuItem>
                           </DropdownMenuContent>

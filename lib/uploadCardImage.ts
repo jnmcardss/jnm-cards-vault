@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { supabase } from "@/lib/supabase/client";
 
 export async function uploadCardImage(file: File, userId: string) {
   if (!file.type.startsWith("image/")) {
@@ -8,15 +8,13 @@ export async function uploadCardImage(file: File, userId: string) {
   const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
   const filePath = `${userId}/${Date.now()}_${safeName}`;
 
-  const { error } = await supabase.storage
+  const { error: uploadError } = await supabase.storage
     .from("card-images")
-    .upload(filePath, file);
+    .upload(filePath, file, { upsert: false });
 
-  if (error) throw error;
+  if (uploadError) throw uploadError;
 
-  const { data } = supabase.storage
-    .from("card-images")
-    .getPublicUrl(filePath);
+  const { data } = supabase.storage.from("card-images").getPublicUrl(filePath);
 
   return data.publicUrl;
 }
