@@ -17,8 +17,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "JNM Cardss Vault",
+  title: "JNM Cards Vault",
   description: "Track and manage your trading card collection",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
