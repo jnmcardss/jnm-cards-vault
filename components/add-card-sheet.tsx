@@ -12,6 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCards, type CardRow } from "@/lib/cards-store";
+import { supabase } from "@/lib/supabaseClient";
+import { uploadCardImage } from "@/lib/uploadCardImage";
 
 export function AddCardSheet() {
   const { addCard } = useCards();
@@ -29,6 +31,9 @@ export function AddCardSheet() {
   const [value, setValue] = useState<number>(0);
   const [status, setStatus] = useState<CardRow["status"]>("In Collection");
 
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
   function reset() {
     setPlayer("");
     setTeam("");
@@ -41,10 +46,29 @@ export function AddCardSheet() {
     setPaid(0);
     setValue(0);
     setStatus("In Collection");
+    setImageFile(null);
+    setImagePreview(null);
   }
 
-  function save() {
+  async function save() {
     if (!player.trim()) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert("You must be signed in.");
+      return;
+    }
+
+    let image_url: string | null = null;
+
+    if (imageFile) {
+      try {
+        image_url = await uploadCardImage(imageFile, user.id);
+      } catch (err: any) {
+        alert(err?.message ?? "Image upload failed");
+        return;
+      }
+    }
 
     addCard({
       player: player.trim(),
@@ -58,6 +82,7 @@ export function AddCardSheet() {
       paid: Number(paid) || 0,
       value: Number(value) || 0,
       status,
+      image_url,
     });
 
     setOpen(false);
@@ -75,7 +100,6 @@ export function AddCardSheet() {
           side="right"
           className="z-50 flex h-full w-full flex-col bg-white p-0 text-slate-900 sm:max-w-md"
         >
-          {/* Header (fixed) */}
           <SheetHeader className="shrink-0 border-b px-6 py-5">
             <SheetTitle className="text-xl font-semibold">Add Card</SheetTitle>
             <p className="text-sm text-slate-600">
@@ -84,9 +108,9 @@ export function AddCardSheet() {
             </p>
           </SheetHeader>
 
-          {/* Scrollable form area */}
           <div className="flex-1 overflow-y-auto px-6 py-6">
             <div className="space-y-5">
+
               <div>
                 <div className="mb-1 text-sm font-semibold text-slate-800">
                   Player Name *
@@ -117,7 +141,6 @@ export function AddCardSheet() {
                 </div>
                 <Input
                   className="h-12 text-base"
-                  placeholder="2024"
                   value={String(year)}
                   onChange={(e) => setYear(Number(e.target.value || "0"))}
                 />
@@ -141,7 +164,7 @@ export function AddCardSheet() {
                 </div>
                 <Input
                   className="h-12 text-base"
-                  placeholder="Prizm, Select, Museum Collection..."
+                  placeholder="Prizm, Select..."
                   value={setName}
                   onChange={(e) => setSetName(e.target.value)}
                 />
@@ -159,88 +182,46 @@ export function AddCardSheet() {
                 />
               </div>
 
+              {/* IMAGE UPLOAD */}
               <div>
                 <div className="mb-1 text-sm font-semibold text-slate-800">
-                  Rarity
+                  Card Image
                 </div>
-                <Select value={rarity} onValueChange={(v) => setRarity(v as any)}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Rarity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Common">Common</SelectItem>
-                    <SelectItem value="Rare">Rare</SelectItem>
-                    <SelectItem value="Ultra Rare">Ultra Rare</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">
-                  Condition
-                </div>
-                <Select value={condition} onValueChange={setCondition}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Condition" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Mint">Mint</SelectItem>
-                    <SelectItem value="Near Mint">Near Mint</SelectItem>
-                    <SelectItem value="Excellent">Excellent</SelectItem>
-                    <SelectItem value="PSA 10">PSA 10</SelectItem>
-                    <SelectItem value="BGS 9.5">BGS 9.5</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setImageFile(file);
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="mb-1 text-sm font-semibold text-slate-800">
-                    Paid (£)
-                  </div>
-                  <Input
-                    className="h-12 text-base"
-                    value={String(paid)}
-                    onChange={(e) => setPaid(Number(e.target.value || "0"))}
+                    if (file) {
+                      setImagePreview(URL.createObjectURL(file));
+                    } else {
+                      setImagePreview(null);
+                    }
+                  }}
+                />
+
+                {imagePreview && (
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="mt-3 h-40 w-full rounded border object-contain"
                   />
-                </div>
-
-                <div>
-                  <div className="mb-1 text-sm font-semibold text-slate-800">
-                    Value (£)
-                  </div>
-                  <Input
-                    className="h-12 text-base"
-                    value={String(value)}
-                    onChange={(e) => setValue(Number(e.target.value || "0"))}
-                  />
-                </div>
+                )}
               </div>
 
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">
-                  Status
-                </div>
-                <Select value={status} onValueChange={(v) => setStatus(v as any)}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="In Collection">In Collection</SelectItem>
-                    <SelectItem value="For Sale">For Sale</SelectItem>
-                    <SelectItem value="Sold">Sold</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* little spacer so last field isn't tight to the sticky footer */}
               <div className="h-2" />
+
             </div>
           </div>
 
-          {/* Footer (fixed / sticky) */}
           <div className="shrink-0 border-t bg-white px-6 py-5">
-            <Button className="h-12 w-full text-base font-semibold" onClick={save}>
+            <Button
+              className="h-12 w-full text-base font-semibold"
+              onClick={save}
+            >
               Save Card
             </Button>
           </div>
