@@ -1,10 +1,11 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-
+import { supabase } from "@/lib/supabaseClient";
 
 export type CardRow = {
   id: string;
+  user_id: string;
   player: string;
   team: string;
   year: number;
@@ -16,16 +17,16 @@ export type CardRow = {
   paid: number;
   value: number;
   status: "In Collection" | "For Sale" | "Sold";
+  image_url?: string | null;
 };
 
-const seed: CardRow[] = [];
-
- 
+type NewCard = Omit<CardRow, "id" | "user_id">;
 
 type Ctx = {
   cards: CardRow[];
-  addCard: (c: Omit<CardRow, "id">) => void;
-  deleteCard: (id: string) => void;
+  addCard: (c: NewCard) => Promise<void>;
+  deleteCard: (id: string) => Promise<void>;
+  refreshCards: () => Promise<void>;
   totals: {
     totalCards: number;
     uniquePlayers: number;
@@ -36,39 +37,121 @@ type Ctx = {
   };
 };
 
-
 const CardsContext = createContext<Ctx | null>(null);
 
 export function CardsProvider({ children }: { children: React.ReactNode }) {
-  const STORAGE_KEY = "cardvault.cards";
+  const [cards, setCards] = useState<CardRow[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
 
-const [cards, setCards] = useState<CardRow[]>(() => {
-  if (typeof window === "undefined") return seed;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as CardRow[]) : seed;
-  } catch {
-    return seed;
-  }
-});
+  // Track auth + load cards on login
+  useEffect(() => {
+    let ignore = false;
 
+    async function init() {
+      const { data } = await supabase.auth.getSession();
+      const uid = data.session?.user.id ?? null;
+      if (!ignore) setUserId(uid);
+      if (uid) await refreshCards();
+      else setCards([]);
+    }
 
-  const addCard = (c: Omit<CardRow, "id">) => {
-    setCards((prev) => [{ ...c, id: crypto.randomUUID() }, ...prev]);
+    init();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const uid = session?.user.id ?? null;
+      setUserId(uid);
+      if (uid) await refreshCards();
+      else setCards([]);
+    });
+
+    return () => {
+      ignore = true;
+      sub.subscription.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const refreshCards = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setCards([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("cards")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("refreshCards error:", error.message);
+      return;
+    }
+
+    setCards((data ?? []) as CardRow[]);
   };
 
-  const deleteCard = (id: string) => {
-  setCards((prev) => prev.filter((c) => c.id !== id));
-};
-useEffect(() => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
-  } catch {
-    // ignore
-  }
-}, [cards]);
+  const addCard = async (c: NewCard) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert("You must be signed in.");
+      return;
+    }
 
+    const payload = {
+      user_id: user.id,
+      player: c.player,
+      team: c.team,
+      year: c.year,
+      brand: c.brand,
+      set: c.set,
+      variant: c.variant,
+      rarity: c.rarity,
+      condition: c.condition,
+      paid: c.paid,
+      value: c.value,
+      status: c.status,
+      image_url: c.image_url ?? null,
+    };
 
+    const { data, error } = await supabase
+      .from("cards")
+      .insert([payload])
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("addCard error:", error.message);
+      alert(error.message);
+      return;
+    }
+
+    // Update UI immediately
+    setCards((prev) => [data as CardRow, ...prev]);
+  };
+
+  const deleteCard = async (id: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert("You must be signed in.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("cards")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("deleteCard error:", error.message);
+      alert(error.message);
+      return;
+    }
+
+    setCards((prev) => prev.filter((c) => c.id !== id));
+  };
 
   const totals = useMemo(() => {
     const totalCards = cards.length;
@@ -84,7 +167,7 @@ useEffect(() => {
   }, [cards]);
 
   return (
-    <CardsContext.Provider value={{ cards, addCard, deleteCard, totals }}>
+    <CardsContext.Provider value={{ cards, addCard, deleteCard, refreshCards, totals }}>
       {children}
     </CardsContext.Provider>
   );
