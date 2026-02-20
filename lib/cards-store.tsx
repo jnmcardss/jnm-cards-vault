@@ -115,11 +115,11 @@ export function CardsProvider({ children }: { children: React.ReactNode }) {
       image_url: c.image_url ?? null,
     };
 
-    const { data, error } = await supabase
-      .from("cards")
-      .insert([payload])
-      .select("*")
-      .single();
+  const { data, error } = await supabase
+  .from("cards")
+  .insert(payload as any)
+  .select("*")
+  .single();
 
     if (error) {
       console.error("addCard error:", error.message);
