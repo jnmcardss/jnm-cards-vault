@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCards, type CardRow } from "@/lib/cards-store";
-import { supabase } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase-browser";
 import { uploadCardImage } from "@/lib/uploadCardImage";
 
 export function AddCardSheet() {
