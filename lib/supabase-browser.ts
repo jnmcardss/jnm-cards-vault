@@ -4,8 +4,10 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-// singleton (prevents multiple GoTrue clients)
-const globalForSupabase = globalThis as unknown as { supabase?: ReturnType<typeof createClient> };
+// Ensure ONE client across the whole app (including production)
+const globalForSupabase = globalThis as unknown as {
+  supabase?: ReturnType<typeof createClient>;
+};
 
 export const supabase =
   globalForSupabase.supabase ??
@@ -17,4 +19,4 @@ export const supabase =
     },
   });
 
-if (process.env.NODE_ENV !== "production") globalForSupabase.supabase = supabase;
+globalForSupabase.supabase = supabase;
