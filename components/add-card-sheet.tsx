@@ -45,60 +45,71 @@ export function AddCardSheet() {
     setImagePreview(null);
   }
 
-  async function save() {
-    if (!player.trim()) {
-      alert("Player Name is required.");
+async function save() {
+  if (!player.trim()) {
+    alert("Player Name is required.");
+    return;
+  }
+
+  setSaving(true);
+
+  // fail-safe so it never spins forever
+  const timeout = setTimeout(() => {
+    console.warn("Save is taking too long (over 20s)...");
+  }, 20000);
+
+  try {
+    console.log("[SAVE] 1) getting user...");
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser();
+
+    console.log("[SAVE] 1b) user:", user?.id, "error:", userErr?.message);
+
+    if (!user) {
+      alert("You must be signed in.");
       return;
     }
 
-    setSaving(true);
+    let image_url: string | null = null;
 
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        alert("You must be signed in.");
-        return;
-      }
-
-      let image_url: string | null = null;
-
-      if (imageFile) {
-        try {
-          image_url = await uploadCardImage(imageFile, user.id);
-        } catch (err: any) {
-          alert(err?.message ?? "Image upload failed");
-          return;
-        }
-      }
-
-      await addCard({
-        player: player.trim(),
-        team: team.trim() || "—",
-        year: Number(year) || 0,
-        brand: brand.trim() || "—",
-        set: setName.trim() || "—",
-        variant: variant.trim() || "—",
-        rarity,
-        condition,
-        paid: Number(paid) || 0,
-        value: Number(value) || 0,
-        status,
-        image_url,
-      });
-
-      setOpen(false);
-      reset();
-    } catch (err: any) {
-      console.error("Save failed:", err);
-      alert(err?.message ?? "Save failed");
-    } finally {
-      setSaving(false);
+    if (imageFile) {
+      console.log("[SAVE] 2) uploading image...");
+      image_url = await uploadCardImage(imageFile, user.id);
+      console.log("[SAVE] 2b) uploaded image_url:", image_url);
+    } else {
+      console.log("[SAVE] 2) no image selected, skipping upload");
     }
-  }
 
+    console.log("[SAVE] 3) inserting card row...");
+    await addCard({
+      player: player.trim(),
+      team: team.trim() || "—",
+      year: Number(year) || 0,
+      brand: brand.trim() || "—",
+      set: setName.trim() || "—",
+      variant: variant.trim() || "—",
+      rarity,
+      condition,
+      paid: Number(paid) || 0,
+      value: Number(value) || 0,
+      status,
+      image_url,
+    });
+    console.log("[SAVE] 3b) insert done");
+
+    setOpen(false);
+    reset();
+  } catch (err: any) {
+    console.error("[SAVE] failed:", err);
+    alert(err?.message ?? "Save failed");
+  } finally {
+    clearTimeout(timeout);
+    setSaving(false);
+    console.log("[SAVE] 4) finished");
+  }
+}
   return (
     <>
       <Button className="h-11 rounded-xl" onClick={() => setOpen(true)}>
