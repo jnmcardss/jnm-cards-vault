@@ -4,13 +4,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useCards, type CardRow } from "@/lib/cards-store";
 import { supabase } from "@/lib/supabase-browser";
 import { uploadCardImage } from "@/lib/uploadCardImage";
@@ -34,6 +27,8 @@ export function AddCardSheet() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  const [saving, setSaving] = useState(false);
+
   function reset() {
     setPlayer("");
     setTeam("");
@@ -51,42 +46,57 @@ export function AddCardSheet() {
   }
 
   async function save() {
-    if (!player.trim()) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      alert("You must be signed in.");
+    if (!player.trim()) {
+      alert("Player Name is required.");
       return;
     }
 
-    let image_url: string | null = null;
+    setSaving(true);
 
-    if (imageFile) {
-      try {
-        image_url = await uploadCardImage(imageFile, user.id);
-      } catch (err: any) {
-        alert(err?.message ?? "Image upload failed");
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("You must be signed in.");
         return;
       }
+
+      let image_url: string | null = null;
+
+      if (imageFile) {
+        try {
+          image_url = await uploadCardImage(imageFile, user.id);
+        } catch (err: any) {
+          alert(err?.message ?? "Image upload failed");
+          return;
+        }
+      }
+
+      await addCard({
+        player: player.trim(),
+        team: team.trim() || "—",
+        year: Number(year) || 0,
+        brand: brand.trim() || "—",
+        set: setName.trim() || "—",
+        variant: variant.trim() || "—",
+        rarity,
+        condition,
+        paid: Number(paid) || 0,
+        value: Number(value) || 0,
+        status,
+        image_url,
+      });
+
+      setOpen(false);
+      reset();
+    } catch (err: any) {
+      console.error("Save failed:", err);
+      alert(err?.message ?? "Save failed");
+    } finally {
+      setSaving(false);
     }
-
-    await addCard({
-      player: player.trim(),
-      team: team.trim() || "—",
-      year: Number(year) || 0,
-      brand: brand.trim() || "—",
-      set: setName.trim() || "—",
-      variant: variant.trim() || "—",
-      rarity,
-      condition,
-      paid: Number(paid) || 0,
-      value: Number(value) || 0,
-      status,
-      image_url,
-    });
-
-    setOpen(false);
-    reset();
   }
 
   return (
@@ -110,7 +120,6 @@ export function AddCardSheet() {
 
           <div className="flex-1 overflow-y-auto px-6 py-6">
             <div className="space-y-5">
-
               <div>
                 <div className="mb-1 text-sm font-semibold text-slate-800">
                   Player Name *
@@ -124,9 +133,7 @@ export function AddCardSheet() {
               </div>
 
               <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">
-                  Team
-                </div>
+                <div className="mb-1 text-sm font-semibold text-slate-800">Team</div>
                 <Input
                   className="h-12 text-base"
                   placeholder="e.g. Real Madrid"
@@ -136,9 +143,7 @@ export function AddCardSheet() {
               </div>
 
               <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">
-                  Year
-                </div>
+                <div className="mb-1 text-sm font-semibold text-slate-800">Year</div>
                 <Input
                   className="h-12 text-base"
                   value={String(year)}
@@ -147,9 +152,7 @@ export function AddCardSheet() {
               </div>
 
               <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">
-                  Brand
-                </div>
+                <div className="mb-1 text-sm font-semibold text-slate-800">Brand</div>
                 <Input
                   className="h-12 text-base"
                   placeholder="Topps, Panini..."
@@ -159,9 +162,7 @@ export function AddCardSheet() {
               </div>
 
               <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">
-                  Set Name
-                </div>
+                <div className="mb-1 text-sm font-semibold text-slate-800">Set Name</div>
                 <Input
                   className="h-12 text-base"
                   placeholder="Prizm, Select..."
@@ -182,7 +183,6 @@ export function AddCardSheet() {
                 />
               </div>
 
-              {/* IMAGE UPLOAD */}
               <div>
                 <div className="mb-1 text-sm font-semibold text-slate-800">
                   Card Image
@@ -195,11 +195,8 @@ export function AddCardSheet() {
                     const file = e.target.files?.[0] ?? null;
                     setImageFile(file);
 
-                    if (file) {
-                      setImagePreview(URL.createObjectURL(file));
-                    } else {
-                      setImagePreview(null);
-                    }
+                    if (file) setImagePreview(URL.createObjectURL(file));
+                    else setImagePreview(null);
                   }}
                 />
 
@@ -213,7 +210,6 @@ export function AddCardSheet() {
               </div>
 
               <div className="h-2" />
-
             </div>
           </div>
 
@@ -221,8 +217,9 @@ export function AddCardSheet() {
             <Button
               className="h-12 w-full text-base font-semibold"
               onClick={save}
+              disabled={saving}
             >
-              Save Card
+              {saving ? "Saving..." : "Save Card"}
             </Button>
           </div>
         </SheetContent>
