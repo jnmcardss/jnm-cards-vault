@@ -1,3 +1,4 @@
+"use client";
 import { AuthGuard } from "@/components/auth-guard";
 import { KpiCards } from "@/components/kpi-cards";
 import { Charts } from "@/components/charts";

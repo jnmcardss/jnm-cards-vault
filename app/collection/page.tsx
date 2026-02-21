@@ -1,3 +1,4 @@
+"use client";
 import { CollectionTable } from "../../components/collection-table";
 import { AuthGuard } from "@/components/auth-guard";
 
