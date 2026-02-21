@@ -30,12 +30,10 @@ export function TopNav() {
   const isAuthed = !!email;
 
   useEffect(() => {
-    // 1) Get current session on load
     supabase.auth.getSession().then(({ data }) => {
       setEmail(data.session?.user?.email ?? null);
     });
 
-    // 2) Listen for auth changes (login/logout)
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setEmail(session?.user?.email ?? null);
     });
@@ -52,46 +50,40 @@ export function TopNav() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push("/login"); // change if your route is different
+    router.push("/login");
     router.refresh();
   }
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white/90 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4">
         {/* Logo + Brand */}
-        <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-3">
-            <Image
-              src="/jnm-logo.png"
-              alt="JNM Cardss Logo"
-              width={40}
-              height={40}
-              className="rounded-lg"
-            />
-            <div>
-              <div className="text-lg font-bold tracking-tight">
-                JNM Cardss Vault
-              </div>
-              <div className="text-xs text-slate-500">
-                Trading Card Collection Manager
-              </div>
-            </div>
-          </Link>
-        </div>
+        <Link href="/" className="flex items-center gap-3">
+          <Image
+            src="/jnm-logo.png"
+            alt="JNM Cardss Logo"
+            width={40}
+            height={40}
+            className="rounded-lg"
+          />
+          <div>
+            <div className="text-lg font-bold tracking-tight">JNM Cardss Vault</div>
+            <div className="text-xs text-slate-500">Trading Card Collection Manager</div>
+          </div>
+        </Link>
 
         {/* Right side */}
-        <div className="flex items-center gap-4">
-          {/* Only show nav when logged in */}
+        <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-3">
+          {/* Nav (only when logged in) */}
           {isAuthed && (
-            <nav className="flex gap-2">
+            <nav className="flex flex-wrap gap-2">
               {items.map(({ href, label, icon: Icon }) => {
                 const active = pathname === href;
                 return (
                   <Link
                     key={href}
                     href={href}
-                    className={`px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium transition ${
+                    className={`px-3 sm:px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium transition ${
                       active
                         ? "bg-slate-900 text-white"
                         : "text-slate-600 hover:bg-slate-100"
@@ -107,13 +99,11 @@ export function TopNav() {
 
           {/* Account area */}
           {isAuthed ? (
-            <div className="flex items-center gap-3">
-              {/* Email */}
-              <span className="hidden sm:block text-sm text-slate-600">
-                {email}
-              </span>
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Email (hide on small screens) */}
+              <span className="hidden md:block text-sm text-slate-600">{email}</span>
 
-              {/* Avatar circle */}
+              {/* Avatar */}
               <div
                 className="h-9 w-9 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-semibold"
                 title={email ?? ""}
@@ -121,7 +111,6 @@ export function TopNav() {
                 {avatarText}
               </div>
 
-              {/* Logout */}
               <Button variant="outline" onClick={handleLogout}>
                 Logout
               </Button>
