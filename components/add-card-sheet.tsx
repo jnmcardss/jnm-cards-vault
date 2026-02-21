@@ -53,19 +53,13 @@ async function save() {
 
   setSaving(true);
 
-  // fail-safe so it never spins forever
-  const timeout = setTimeout(() => {
-    console.warn("Save is taking too long (over 20s)...");
-  }, 20000);
-
   try {
-    console.log("[SAVE] 1) getting user...");
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser();
+    console.log("[SAVE] 1) getting session...");
 
-    console.log("[SAVE] 1b) user:", user?.id, "error:", userErr?.message);
+    const { data } = await supabase.auth.getSession();
+    const user = data.session?.user;
+
+    console.log("[SAVE] 1b) user:", user?.id);
 
     if (!user) {
       alert("You must be signed in.");
@@ -77,12 +71,11 @@ async function save() {
     if (imageFile) {
       console.log("[SAVE] 2) uploading image...");
       image_url = await uploadCardImage(imageFile, user.id);
-      console.log("[SAVE] 2b) uploaded image_url:", image_url);
-    } else {
-      console.log("[SAVE] 2) no image selected, skipping upload");
+      console.log("[SAVE] 2b) uploaded:", image_url);
     }
 
-    console.log("[SAVE] 3) inserting card row...");
+    console.log("[SAVE] 3) inserting card...");
+
     await addCard({
       player: player.trim(),
       team: team.trim() || "—",
@@ -97,7 +90,8 @@ async function save() {
       status,
       image_url,
     });
-    console.log("[SAVE] 3b) insert done");
+
+    console.log("[SAVE] 4) done");
 
     setOpen(false);
     reset();
@@ -105,9 +99,7 @@ async function save() {
     console.error("[SAVE] failed:", err);
     alert(err?.message ?? "Save failed");
   } finally {
-    clearTimeout(timeout);
     setSaving(false);
-    console.log("[SAVE] 4) finished");
   }
 }
   return (
