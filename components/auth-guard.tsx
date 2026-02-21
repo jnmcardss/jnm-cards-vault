@@ -1,35 +1,62 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase-browser";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false);
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    async function check() {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        window.location.href = "/login";
-        return;
+    async function run() {
+      const { data, error } = await supabase.auth.getSession();
+
+      const hasSession = !!data?.session && !error;
+
+      if (!mounted) return;
+
+      setAuthed(hasSession);
+      setLoading(false);
+
+      if (!hasSession) {
+        router.replace("/login");
       }
-      if (mounted) setReady(true);
     }
 
-    check();
+    run();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) window.location.href = "/login";
+      const hasSession = !!session;
+      setAuthed(hasSession);
+      setLoading(false);
+      if (!hasSession) router.replace("/login");
     });
 
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [router]);
 
-  if (!ready) return null;
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-6xl px-6 py-10 text-slate-600">
+        Checking login…
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return (
+      <div className="mx-auto max-w-6xl px-6 py-10 text-slate-600">
+        Redirecting to login…
+      </div>
+    );
+  }
+
   return <>{children}</>;
 }
