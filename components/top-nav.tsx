@@ -30,16 +30,22 @@ export function TopNav() {
   const isAuthed = !!email;
 
   useEffect(() => {
+    let mounted = true;
+
     supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
       setEmail(data.session?.user?.email ?? null);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       setEmail(session?.user?.email ?? null);
     });
 
     return () => {
-      sub.subscription.unsubscribe();
+      mounted = false;
+      // ✅ safe unsubscribe (prevents crashes)
+      data?.subscription?.unsubscribe();
     };
   }, []);
 
@@ -74,7 +80,6 @@ export function TopNav() {
 
         {/* Right side */}
         <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-3">
-          {/* Nav (only when logged in) */}
           {isAuthed && (
             <nav className="flex flex-wrap gap-2">
               {items.map(({ href, label, icon: Icon }) => {
@@ -97,13 +102,10 @@ export function TopNav() {
             </nav>
           )}
 
-          {/* Account area */}
           {isAuthed ? (
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Email (hide on small screens) */}
               <span className="hidden md:block text-sm text-slate-600">{email}</span>
 
-              {/* Avatar */}
               <div
                 className="h-9 w-9 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-semibold"
                 title={email ?? ""}
@@ -116,9 +118,8 @@ export function TopNav() {
               </Button>
             </div>
           ) : (
-            <Button asChild>
-              <Link href="/login">Login</Link>
-            </Button>
+            // ✅ simple button (no Link nesting)
+            <Button onClick={() => router.push("/login")}>Login</Button>
           )}
         </div>
       </div>
