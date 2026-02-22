@@ -8,29 +8,76 @@ import { useCards, type CardRow } from "@/lib/cards-store";
 import { supabase } from "@/lib/supabase-browser";
 import { uploadCardImage } from "@/lib/uploadCardImage";
 
+/* ---------------- STATUS SEGMENT ---------------- */
+
+type Status = CardRow["status"];
+
+function StatusSegment({
+  value,
+  onChange,
+}: {
+  value: Status;
+  onChange: (v: Status) => void;
+}) {
+  const options: { value: Status; label: string; icon: string }[] = [
+    { value: "In Collection", label: "Collection", icon: "📦" },
+    { value: "For Sale", label: "For Sale", icon: "💷" },
+    { value: "Sold", label: "Sold", icon: "✅" },
+  ];
+
+  return (
+    <div>
+      <div className="mb-2 text-sm font-semibold text-slate-800">Status</div>
+
+      <div className="flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1">
+        {options.map((opt) => {
+          const active = value === opt.value;
+
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              className={[
+                "flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold transition",
+                active
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "text-slate-700 hover:bg-white",
+              ].join(" ")}
+            >
+              <span className="text-base">{opt.icon}</span>
+              <span>{opt.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- MAIN SHEET ---------------- */
+
 export function AddCardSheet() {
   const { addCard } = useCards();
   const [open, setOpen] = useState(false);
 
   const [player, setPlayer] = useState("");
   const [team, setTeam] = useState("");
-  const [year, setYear] = useState<number>(2024);
+  const [year, setYear] = useState(2024);
   const [brand, setBrand] = useState("");
   const [setName, setSetName] = useState("");
   const [variant, setVariant] = useState("");
-  const [rarity, setRarity] = useState<CardRow["rarity"]>("Common");
-  const [condition, setCondition] = useState("Near Mint");
+  const [rarity] = useState<CardRow["rarity"]>("Common");
+  const [condition] = useState("Near Mint");
 
-  // ✅ pricing + status
   const [status, setStatus] = useState<CardRow["status"]>("In Collection");
-  const [paid, setPaid] = useState<number>(0);
-  const [value, setValue] = useState<number>(0);
-  const [askingPrice, setAskingPrice] = useState<number>(0);
-  const [soldPrice, setSoldPrice] = useState<number>(0);
+  const [paid, setPaid] = useState(0);
+  const [value, setValue] = useState(0);
+  const [askingPrice, setAskingPrice] = useState(0);
+  const [soldPrice, setSoldPrice] = useState(0);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-
+  const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   function reset() {
@@ -40,35 +87,24 @@ export function AddCardSheet() {
     setBrand("");
     setSetName("");
     setVariant("");
-    setRarity("Common");
-    setCondition("Near Mint");
-
     setStatus("In Collection");
     setPaid(0);
     setValue(0);
     setAskingPrice(0);
     setSoldPrice(0);
-
     setImageFile(null);
-    setImagePreview(null);
+    setPreview(null);
   }
 
   async function save() {
-    if (!player.trim()) {
-      alert("Player Name is required.");
-      return;
-    }
+    if (!player.trim()) return alert("Player name required");
 
     setSaving(true);
 
     try {
       const { data } = await supabase.auth.getSession();
       const user = data.session?.user;
-
-      if (!user) {
-        alert("You must be signed in.");
-        return;
-      }
+      if (!user) return alert("Not signed in");
 
       let image_url: string | null = null;
 
@@ -77,31 +113,25 @@ export function AddCardSheet() {
       }
 
       await addCard({
-        player: player.trim(),
-        team: team.trim() || "—",
-        year: Number(year) || 0,
-        brand: brand.trim() || "—",
-        set: setName.trim() || "—",
-        variant: variant.trim() || "—",
+        player,
+        team,
+        year,
+        brand,
+        set: setName,
+        variant,
         rarity,
         condition,
-
-        paid: Number(paid) || 0,
-        value: Number(value) || 0,
+        paid,
+        value,
         status,
-
-        asking_price: status === "For Sale" ? Number(askingPrice) || 0 : null,
-        sold_price: status === "Sold" ? Number(soldPrice) || 0 : null,
+        asking_price: status === "For Sale" ? askingPrice : null,
+        sold_price: status === "Sold" ? soldPrice : null,
         sold_at: status === "Sold" ? new Date().toISOString() : null,
-
         image_url,
       });
 
-      setOpen(false);
       reset();
-    } catch (err: any) {
-      console.error("[SAVE] failed:", err);
-      alert(err?.message ?? "Save failed");
+      setOpen(false);
     } finally {
       setSaving(false);
     }
@@ -109,186 +139,58 @@ export function AddCardSheet() {
 
   return (
     <>
-      <Button className="h-11 rounded-xl" onClick={() => setOpen(true)}>
-        Add Card
-      </Button>
+      <Button onClick={() => setOpen(true)}>Add Card</Button>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent
-          side="right"
-          className="z-50 flex h-full w-full flex-col bg-white p-0 text-slate-900 sm:max-w-md"
-        >
-          <SheetHeader className="shrink-0 border-b px-6 py-5">
-            <SheetTitle className="text-xl font-semibold">Add Card</SheetTitle>
-            <p className="text-sm text-slate-600">
-              Enter the details below, then hit <span className="font-medium">Save Card</span>.
-            </p>
+        <SheetContent side="right" className="p-0 sm:max-w-md">
+
+          <SheetHeader className="border-b px-6 py-4">
+            <SheetTitle>Add Card</SheetTitle>
           </SheetHeader>
 
-          <div className="flex-1 overflow-y-auto px-6 py-6">
-            <div className="space-y-5">
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">Player Name *</div>
-                <Input
-                  className="h-12 text-base"
-                  placeholder="e.g. Jude Bellingham"
-                  value={player}
-                  onChange={(e) => setPlayer(e.target.value)}
-                />
-              </div>
+          <div className="space-y-4 overflow-y-auto px-6 py-4">
 
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">Team</div>
-                <Input
-                  className="h-12 text-base"
-                  placeholder="e.g. Real Madrid"
-                  value={team}
-                  onChange={(e) => setTeam(e.target.value)}
-                />
-              </div>
+            <Input placeholder="Player name" value={player} onChange={(e) => setPlayer(e.target.value)} />
+            <Input placeholder="Team" value={team} onChange={(e) => setTeam(e.target.value)} />
+            <Input type="number" value={year} onChange={(e) => setYear(+e.target.value)} />
+            <Input placeholder="Brand" value={brand} onChange={(e) => setBrand(e.target.value)} />
+            <Input placeholder="Set" value={setName} onChange={(e) => setSetName(e.target.value)} />
+            <Input placeholder="Variant" value={variant} onChange={(e) => setVariant(e.target.value)} />
 
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">Year</div>
-                <Input
-                  className="h-12 text-base"
-                  type="number"
-                  value={String(year)}
-                  onChange={(e) => setYear(Number(e.target.value || "0"))}
-                />
-              </div>
+            <StatusSegment value={status} onChange={setStatus} />
 
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">Brand</div>
-                <Input
-                  className="h-12 text-base"
-                  placeholder="Topps, Panini..."
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                />
-              </div>
+            <Input type="number" placeholder="Paid (£)" value={paid} onChange={(e) => setPaid(+e.target.value)} />
+            <Input type="number" placeholder="Current Value (£)" value={value} onChange={(e) => setValue(+e.target.value)} />
 
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">Set Name</div>
-                <Input
-                  className="h-12 text-base"
-                  placeholder="Prizm, Select..."
-                  value={setName}
-                  onChange={(e) => setSetName(e.target.value)}
-                />
-              </div>
+            {status === "For Sale" && (
+              <Input type="number" placeholder="Asking Price (£)" value={askingPrice} onChange={(e) => setAskingPrice(+e.target.value)} />
+            )}
 
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">Variant / Parallel</div>
-                <Input
-                  className="h-12 text-base"
-                  placeholder="Base, Silver Prizm, /25..."
-                  value={variant}
-                  onChange={(e) => setVariant(e.target.value)}
-                />
-              </div>
+            {status === "Sold" && (
+              <Input type="number" placeholder="Sold Price (£)" value={soldPrice} onChange={(e) => setSoldPrice(+e.target.value)} />
+            )}
 
-              {/* ✅ NEW: status + money fields */}
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">Status</div>
-                <select
-                  className="h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-base"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as CardRow["status"])}
-                >
-                  <option value="In Collection">In Collection</option>
-                  <option value="For Sale">For Sale</option>
-                  <option value="Sold">Sold</option>
-                </select>
-              </div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setImageFile(f);
+                if (f) setPreview(URL.createObjectURL(f));
+              }}
+            />
 
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">Paid (£)</div>
-                <Input
-                  className="h-12 text-base"
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="e.g. 25"
-                  value={paid}
-                  onChange={(e) => setPaid(Number(e.target.value || "0"))}
-                />
-              </div>
-
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">Current Value (£)</div>
-                <Input
-                  className="h-12 text-base"
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="e.g. 40"
-                  value={value}
-                  onChange={(e) => setValue(Number(e.target.value || "0"))}
-                />
-              </div>
-
-              {status === "For Sale" && (
-                <div>
-                  <div className="mb-1 text-sm font-semibold text-slate-800">Asking Price (£)</div>
-                  <Input
-                    className="h-12 text-base"
-                    type="number"
-                    inputMode="decimal"
-                    placeholder="e.g. 60"
-                    value={askingPrice}
-                    onChange={(e) => setAskingPrice(Number(e.target.value || "0"))}
-                  />
-                </div>
-              )}
-
-              {status === "Sold" && (
-                <div>
-                  <div className="mb-1 text-sm font-semibold text-slate-800">Sold Price (£)</div>
-                  <Input
-                    className="h-12 text-base"
-                    type="number"
-                    inputMode="decimal"
-                    placeholder="e.g. 75"
-                    value={soldPrice}
-                    onChange={(e) => setSoldPrice(Number(e.target.value || "0"))}
-                  />
-                </div>
-              )}
-
-              <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">Card Image</div>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] ?? null;
-                    setImageFile(file);
-                    if (file) setImagePreview(URL.createObjectURL(file));
-                    else setImagePreview(null);
-                  }}
-                />
-
-                {imagePreview && (
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="mt-3 h-40 w-full rounded border object-contain"
-                  />
-                )}
-              </div>
-
-              <div className="h-2" />
-            </div>
+            {preview && (
+              <img src={preview} className="h-40 w-full rounded object-contain" />
+            )}
           </div>
 
-          <div className="shrink-0 border-t bg-white px-6 py-5">
-            <Button
-              className="h-12 w-full text-base font-semibold"
-              onClick={save}
-              disabled={saving}
-            >
-              {saving ? "Saving..." : "Save Card"}
+          <div className="border-t p-4">
+            <Button className="w-full" onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "Save Card"}
             </Button>
           </div>
+
         </SheetContent>
       </Sheet>
     </>
