@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Layers, ShoppingCart, DollarSign, Package } from "lucide-react";
+import { Layers, ShoppingCart, Package } from "lucide-react";
 import { useCards } from "@/lib/cards-store";
 
 function money(n: number) {
@@ -9,7 +9,25 @@ function money(n: number) {
   return `£${num.toFixed(2)}`;
 }
 
-function Kpi({ title, value, sub, icon: Icon }: any) {
+function Kpi({ title, value, sub, icon: Icon, currency }: any) {
+  return (
+    <Card className="rounded-2xl">
+      <CardContent className="flex items-center justify-between p-6">
+        <div>
+          <div className="text-xs font-semibold tracking-wide text-slate-500">
+            {title}
+          </div>
+          <div className="mt-2 text-3xl font-semibold">{value}</div>
+          {sub && <div className="mt-1 text-sm text-slate-500">{sub}</div>}
+        </div>
+
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-xl font-semibold text-slate-700">
+          {currency ? "£" : <Icon className="h-6 w-6" />}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
   return (
     <Card className="rounded-2xl">
       <CardContent className="flex items-center justify-between p-6">
@@ -38,7 +56,11 @@ export function KpiCards() {
         icon={Layers}
       />
       <Kpi title="TOTAL INVESTED" value={money(totals.totalInvested)} icon={ShoppingCart} />
-      <Kpi title="COLLECTION VALUE" value={money(totals.collectionValue)} icon={DollarSign} />
+      <Kpi
+  title="COLLECTION VALUE"
+  value={money(totals.collectionValue)}
+  currency
+/>
       <Kpi
         title="FOR SALE"
         value={String(totals.forSaleCount)}
