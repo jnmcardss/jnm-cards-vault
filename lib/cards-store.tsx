@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase-browser";
 export type CardRow = {
   id: string;
   user_id: string;
+
   player: string;
   team: string;
   year: number;
@@ -14,34 +15,50 @@ export type CardRow = {
   variant: string;
   rarity: "Common" | "Rare" | "Ultra Rare";
   condition: string;
-  paid: number;
-  value: number;
+
+  paid: number; // cost
+  value: number; // current value / estimate
   status: "In Collection" | "For Sale" | "Sold";
+
+  // images
   image_url?: string | null;
+
+  // ✅ new pricing + timestamps (you added these columns in Supabase)
+  created_at?: string;
+  asking_price?: number | null;
+  sold_price?: number | null;
+  sold_at?: string | null;
 };
 
 type NewCard = Omit<CardRow, "id" | "user_id">;
+
+type Totals = {
+  totalCards: number;
+  uniquePlayers: number;
+  totalInvested: number;
+  collectionValue: number;
+
+  forSaleCount: number;
+  forSaleAskTotal: number;
+  profitPotential: number;
+
+  soldCount: number;
+  soldRevenue: number;
+  realisedProfit: number;
+};
 
 type Ctx = {
   cards: CardRow[];
   addCard: (c: NewCard) => Promise<void>;
   deleteCard: (id: string) => Promise<void>;
   refreshCards: () => Promise<void>;
-  totals: {
-    totalCards: number;
-    uniquePlayers: number;
-    totalInvested: number;
-    collectionValue: number;
-    forSaleCount: number;
-    soldValue: number;
-  };
+  totals: Totals;
 };
 
 const CardsContext = createContext<Ctx | null>(null);
 
 export function CardsProvider({ children }: { children: React.ReactNode }) {
   const [cards, setCards] = useState<CardRow[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
 
   // Track auth + load cards on login
   useEffect(() => {
@@ -50,18 +67,21 @@ export function CardsProvider({ children }: { children: React.ReactNode }) {
     async function init() {
       const { data } = await supabase.auth.getSession();
       const uid = data.session?.user.id ?? null;
-      if (!ignore) setUserId(uid);
-      if (uid) await refreshCards();
-      else setCards([]);
+
+      if (!uid) {
+        if (!ignore) setCards([]);
+        return;
+      }
+
+      await refreshCards();
     }
 
     init();
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const uid = session?.user.id ?? null;
-      setUserId(uid);
-      if (uid) await refreshCards();
-      else setCards([]);
+      if (!uid) setCards([]);
+      else await refreshCards();
     });
 
     return () => {
@@ -72,17 +92,21 @@ export function CardsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshCards = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
       setCards([]);
       return;
     }
 
+    // ✅ order by created_at so "Recently added" works properly
     const { data, error } = await supabase
       .from("cards")
       .select("*")
       .eq("user_id", user.id)
-      .order("id", { ascending: false });
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("refreshCards error:", error.message);
@@ -93,7 +117,10 @@ export function CardsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addCard = async (c: NewCard) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
       alert("You must be signed in.");
       return;
@@ -101,6 +128,7 @@ export function CardsProvider({ children }: { children: React.ReactNode }) {
 
     const payload = {
       user_id: user.id,
+
       player: c.player,
       team: c.team,
       year: c.year,
@@ -109,17 +137,25 @@ export function CardsProvider({ children }: { children: React.ReactNode }) {
       variant: c.variant,
       rarity: c.rarity,
       condition: c.condition,
-      paid: c.paid,
-      value: c.value,
+
+      paid: Number(c.paid) || 0,
+      value: Number(c.value) || 0,
       status: c.status,
+
       image_url: c.image_url ?? null,
+
+      // ✅ new fields
+      asking_price: c.asking_price ?? null,
+      sold_price: c.sold_price ?? null,
+      sold_at: c.sold_at ?? null,
+      // created_at has a DB default (now()), so we don't need to send it
     };
 
-  const { data, error } = await supabase
-  .from("cards")
-  .insert(payload as any)
-  .select("*")
-  .single();
+    const { data, error } = await supabase
+      .from("cards")
+      .insert(payload as any)
+      .select("*")
+      .single();
 
     if (error) {
       console.error("addCard error:", error.message);
@@ -127,22 +163,21 @@ export function CardsProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Update UI immediately
+    // Update UI immediately (newest first)
     setCards((prev) => [data as CardRow, ...prev]);
   };
 
   const deleteCard = async (id: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
       alert("You must be signed in.");
       return;
     }
 
-    const { error } = await supabase
-      .from("cards")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
+    const { error } = await supabase.from("cards").delete().eq("id", id).eq("user_id", user.id);
 
     if (error) {
       console.error("deleteCard error:", error.message);
@@ -153,17 +188,42 @@ export function CardsProvider({ children }: { children: React.ReactNode }) {
     setCards((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const totals = useMemo(() => {
+  const totals: Totals = useMemo(() => {
     const totalCards = cards.length;
-    const uniquePlayers = new Set(cards.map((c) => c.player.trim().toLowerCase())).size;
+
+    const uniquePlayers = new Set(
+      cards.map((c) => (c.player ?? "").trim().toLowerCase()).filter(Boolean)
+    ).size;
+
     const totalInvested = cards.reduce((s, c) => s + (Number(c.paid) || 0), 0);
     const collectionValue = cards.reduce((s, c) => s + (Number(c.value) || 0), 0);
-    const forSaleCount = cards.filter((c) => c.status === "For Sale").length;
-    const soldValue = cards
-      .filter((c) => c.status === "Sold")
-      .reduce((s, c) => s + (Number(c.value) || 0), 0);
 
-    return { totalCards, uniquePlayers, totalInvested, collectionValue, forSaleCount, soldValue };
+    // For sale summary
+    const forSale = cards.filter((c) => c.status === "For Sale");
+    const forSaleCount = forSale.length;
+    const forSaleAskTotal = forSale.reduce((s, c) => s + (Number(c.asking_price) || 0), 0);
+    const forSaleCostTotal = forSale.reduce((s, c) => s + (Number(c.paid) || 0), 0);
+    const profitPotential = forSaleAskTotal - forSaleCostTotal;
+
+    // Sold summary
+    const sold = cards.filter((c) => c.status === "Sold");
+    const soldCount = sold.length;
+    const soldRevenue = sold.reduce((s, c) => s + (Number(c.sold_price) || 0), 0);
+    const soldCost = sold.reduce((s, c) => s + (Number(c.paid) || 0), 0);
+    const realisedProfit = soldRevenue - soldCost;
+
+    return {
+      totalCards,
+      uniquePlayers,
+      totalInvested,
+      collectionValue,
+      forSaleCount,
+      forSaleAskTotal,
+      profitPotential,
+      soldCount,
+      soldRevenue,
+      realisedProfit,
+    };
   }, [cards]);
 
   return (
