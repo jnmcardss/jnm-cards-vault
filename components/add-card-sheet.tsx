@@ -20,9 +20,13 @@ export function AddCardSheet() {
   const [variant, setVariant] = useState("");
   const [rarity, setRarity] = useState<CardRow["rarity"]>("Common");
   const [condition, setCondition] = useState("Near Mint");
+
+  // ✅ pricing + status
+  const [status, setStatus] = useState<CardRow["status"]>("In Collection");
   const [paid, setPaid] = useState<number>(0);
   const [value, setValue] = useState<number>(0);
-  const [status, setStatus] = useState<CardRow["status"]>("In Collection");
+  const [askingPrice, setAskingPrice] = useState<number>(0);
+  const [soldPrice, setSoldPrice] = useState<number>(0);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -38,70 +42,71 @@ export function AddCardSheet() {
     setVariant("");
     setRarity("Common");
     setCondition("Near Mint");
+
+    setStatus("In Collection");
     setPaid(0);
     setValue(0);
-    setStatus("In Collection");
+    setAskingPrice(0);
+    setSoldPrice(0);
+
     setImageFile(null);
     setImagePreview(null);
   }
 
-async function save() {
-  if (!player.trim()) {
-    alert("Player Name is required.");
-    return;
-  }
-
-  setSaving(true);
-
-  try {
-    console.log("[SAVE] 1) getting session...");
-
-    const { data } = await supabase.auth.getSession();
-    const user = data.session?.user;
-
-    console.log("[SAVE] 1b) user:", user?.id);
-
-    if (!user) {
-      alert("You must be signed in.");
+  async function save() {
+    if (!player.trim()) {
+      alert("Player Name is required.");
       return;
     }
 
-    let image_url: string | null = null;
+    setSaving(true);
 
-    if (imageFile) {
-      console.log("[SAVE] 2) uploading image...");
-      image_url = await uploadCardImage(imageFile, user.id);
-      console.log("[SAVE] 2b) uploaded:", image_url);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user;
+
+      if (!user) {
+        alert("You must be signed in.");
+        return;
+      }
+
+      let image_url: string | null = null;
+
+      if (imageFile) {
+        image_url = await uploadCardImage(imageFile, user.id);
+      }
+
+      await addCard({
+        player: player.trim(),
+        team: team.trim() || "—",
+        year: Number(year) || 0,
+        brand: brand.trim() || "—",
+        set: setName.trim() || "—",
+        variant: variant.trim() || "—",
+        rarity,
+        condition,
+
+        paid: Number(paid) || 0,
+        value: Number(value) || 0,
+        status,
+
+        asking_price: status === "For Sale" ? Number(askingPrice) || 0 : null,
+        sold_price: status === "Sold" ? Number(soldPrice) || 0 : null,
+        sold_at: status === "Sold" ? new Date().toISOString() : null,
+
+        image_url,
+      });
+
+      setOpen(false);
+      reset();
+    } catch (err: any) {
+      console.error("[SAVE] failed:", err);
+      alert(err?.message ?? "Save failed");
+    } finally {
+      setSaving(false);
     }
-
-    console.log("[SAVE] 3) inserting card...");
-
-    await addCard({
-      player: player.trim(),
-      team: team.trim() || "—",
-      year: Number(year) || 0,
-      brand: brand.trim() || "—",
-      set: setName.trim() || "—",
-      variant: variant.trim() || "—",
-      rarity,
-      condition,
-      paid: Number(paid) || 0,
-      value: Number(value) || 0,
-      status,
-      image_url,
-    });
-
-    console.log("[SAVE] 4) done");
-
-    setOpen(false);
-    reset();
-  } catch (err: any) {
-    console.error("[SAVE] failed:", err);
-    alert(err?.message ?? "Save failed");
-  } finally {
-    setSaving(false);
   }
-}
+
   return (
     <>
       <Button className="h-11 rounded-xl" onClick={() => setOpen(true)}>
@@ -116,17 +121,14 @@ async function save() {
           <SheetHeader className="shrink-0 border-b px-6 py-5">
             <SheetTitle className="text-xl font-semibold">Add Card</SheetTitle>
             <p className="text-sm text-slate-600">
-              Enter the details below, then hit{" "}
-              <span className="font-medium">Save Card</span>.
+              Enter the details below, then hit <span className="font-medium">Save Card</span>.
             </p>
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto px-6 py-6">
             <div className="space-y-5">
               <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">
-                  Player Name *
-                </div>
+                <div className="mb-1 text-sm font-semibold text-slate-800">Player Name *</div>
                 <Input
                   className="h-12 text-base"
                   placeholder="e.g. Jude Bellingham"
@@ -149,6 +151,7 @@ async function save() {
                 <div className="mb-1 text-sm font-semibold text-slate-800">Year</div>
                 <Input
                   className="h-12 text-base"
+                  type="number"
                   value={String(year)}
                   onChange={(e) => setYear(Number(e.target.value || "0"))}
                 />
@@ -175,9 +178,7 @@ async function save() {
               </div>
 
               <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">
-                  Variant / Parallel
-                </div>
+                <div className="mb-1 text-sm font-semibold text-slate-800">Variant / Parallel</div>
                 <Input
                   className="h-12 text-base"
                   placeholder="Base, Silver Prizm, /25..."
@@ -186,10 +187,74 @@ async function save() {
                 />
               </div>
 
+              {/* ✅ NEW: status + money fields */}
               <div>
-                <div className="mb-1 text-sm font-semibold text-slate-800">
-                  Card Image
+                <div className="mb-1 text-sm font-semibold text-slate-800">Status</div>
+                <select
+                  className="h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-base"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as CardRow["status"])}
+                >
+                  <option value="In Collection">In Collection</option>
+                  <option value="For Sale">For Sale</option>
+                  <option value="Sold">Sold</option>
+                </select>
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-semibold text-slate-800">Paid (£)</div>
+                <Input
+                  className="h-12 text-base"
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="e.g. 25"
+                  value={paid}
+                  onChange={(e) => setPaid(Number(e.target.value || "0"))}
+                />
+              </div>
+
+              <div>
+                <div className="mb-1 text-sm font-semibold text-slate-800">Current Value (£)</div>
+                <Input
+                  className="h-12 text-base"
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="e.g. 40"
+                  value={value}
+                  onChange={(e) => setValue(Number(e.target.value || "0"))}
+                />
+              </div>
+
+              {status === "For Sale" && (
+                <div>
+                  <div className="mb-1 text-sm font-semibold text-slate-800">Asking Price (£)</div>
+                  <Input
+                    className="h-12 text-base"
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="e.g. 60"
+                    value={askingPrice}
+                    onChange={(e) => setAskingPrice(Number(e.target.value || "0"))}
+                  />
                 </div>
+              )}
+
+              {status === "Sold" && (
+                <div>
+                  <div className="mb-1 text-sm font-semibold text-slate-800">Sold Price (£)</div>
+                  <Input
+                    className="h-12 text-base"
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="e.g. 75"
+                    value={soldPrice}
+                    onChange={(e) => setSoldPrice(Number(e.target.value || "0"))}
+                  />
+                </div>
+              )}
+
+              <div>
+                <div className="mb-1 text-sm font-semibold text-slate-800">Card Image</div>
 
                 <input
                   type="file"
@@ -197,7 +262,6 @@ async function save() {
                   onChange={(e) => {
                     const file = e.target.files?.[0] ?? null;
                     setImageFile(file);
-
                     if (file) setImagePreview(URL.createObjectURL(file));
                     else setImagePreview(null);
                   }}
